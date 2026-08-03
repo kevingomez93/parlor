@@ -262,6 +262,61 @@ curl http://localhost:4001/api/rooms -H "x-api-key: dev-api-key-change-me"
 
 You should see `cluster-test` in the room list from node B.
 
+## Deployment
+
+Parlor ships as a Docker image on GitHub Container Registry:
+
+```text
+ghcr.io/kevingomez93/parlor:latest
+ghcr.io/kevingomez93/parlor:sha-<commit>
+ghcr.io/kevingomez93/parlor:<semver>   # on version tags
+```
+
+Images are built automatically by GitHub Actions on every push to `main` and on `v*` tags.
+
+**Note:** GHCR packages default to private. After the first publish, open the package settings on GitHub and set visibility to **public** if you want unauthenticated pulls.
+
+### Docker Compose (production)
+
+```bash
+cp .env.prod.example .env.prod
+# Edit .env.prod — generate SECRET_KEY_BASE with: mix phx.gen.secret
+
+docker compose -f docker-compose.prod.yml up -d
+```
+
+The app container runs migrations on boot (`bin/migrate`) then starts the release (`bin/server`). Postgres data is persisted in a Docker volume.
+
+Health check: `curl http://localhost:4000/api/health`
+
+### Environment
+
+Production uses the same env vars documented in [Configuration](#configuration). Required in prod:
+
+- `DATABASE_URL`
+- `SECRET_KEY_BASE`
+- `PARLOR_SIGNING_SECRET`
+- `PARLOR_API_KEY`
+
+Set `PHX_SERVER=true` so the release starts the HTTP endpoint.
+
+### Multi-node Docker
+
+For clustered deployments, run multiple app containers with:
+
+- The same `DATABASE_URL`
+- The same `RELEASE_COOKIE`
+- `DNS_CLUSTER_QUERY` set to a DNS name that resolves to all app container IPs (e.g. Docker Compose service name or k8s headless service)
+
+Horde distributes room processes across connected BEAM nodes automatically.
+
+### Build locally
+
+```bash
+docker build -t parlor:local .
+docker run --rm -p 4000:4000 --env-file .env.prod parlor:local
+```
+
 ## Demo
 
 With the server running:

@@ -8,6 +8,7 @@ defmodule Parlor.MixProject do
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      releases: releases(),
       aliases: aliases(),
       deps: deps(),
       listeners: [Phoenix.CodeReloader]
@@ -46,6 +47,15 @@ defmodule Parlor.MixProject do
       {:y_ex, "~> 0.10"},
       {:bandit, "~> 1.5"},
       {:lazy_html, ">= 0.1.0", only: :test}
+    ]
+  end
+
+  defp releases do
+    [
+      parlor: [
+        include_executables_for: [:unix],
+        applications: [runtime_tools: :permanent]
+      ]
     ]
   end
 
