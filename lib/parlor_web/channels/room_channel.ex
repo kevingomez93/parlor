@@ -7,6 +7,8 @@ defmodule ParlorWeb.RoomChannel do
   alias Parlor.Rooms
   alias Parlor.YDoc
 
+  @rate_limited_reply {:error, %{reason: "rate_limited"}}
+
   @impl true
   def join("room:" <> room_id, _params, socket) do
     user = socket.assigns.current_user
@@ -78,8 +80,12 @@ defmodule ParlorWeb.RoomChannel do
 
   @impl true
   def handle_in("msg", payload, socket) when is_map(payload) do
-    broadcast_from!(socket, "msg", Map.put(payload, "from", socket.assigns.current_user.id))
-    {:reply, :ok, socket}
+    with :ok <- check_rate_limit(socket) do
+      broadcast_from!(socket, "msg", Map.put(payload, "from", socket.assigns.current_user.id))
+      {:reply, :ok, socket}
+    else
+      {:rate_limited, socket} -> {:reply, @rate_limited_reply, socket}
+    end
   end
 
   @impl true
@@ -87,57 +93,69 @@ defmodule ParlorWeb.RoomChannel do
 
   @impl true
   def handle_in("yjs", {:binary, chunk}, socket) when is_binary(chunk) do
-    room_id = socket.assigns.room_id
+    with :ok <- check_rate_limit(socket) do
+      room_id = socket.assigns.room_id
 
-    case YDoc.process_message(room_id, chunk, self()) do
-      {:ok, replies} ->
-        Enum.each(replies, &push(socket, "yjs", {:binary, &1}))
-        {:reply, :ok, socket}
+      case YDoc.process_message(room_id, chunk, self()) do
+        {:ok, replies} ->
+          Enum.each(replies, &push(socket, "yjs", {:binary, &1}))
+          {:reply, :ok, socket}
 
-      :ok ->
-        {:reply, :ok, socket}
+        :ok ->
+          {:reply, :ok, socket}
 
-      {:error, reason} ->
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        {:error, reason} ->
+          {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      end
+    else
+      {:rate_limited, socket} -> {:reply, @rate_limited_reply, socket}
     end
   end
 
   @impl true
   def handle_in("state:set", %{"key" => key, "value" => value}, socket) do
-    room_id = socket.assigns.room_id
+    with :ok <- check_rate_limit(socket) do
+      room_id = socket.assigns.room_id
 
-    case Room.set(room_id, key, value) do
-      {:ok, state} ->
-        broadcast_from!(socket, "state:patch", %{
-          "op" => "set",
-          "key" => key,
-          "value" => value,
-          "state" => state
-        })
+      case Room.set(room_id, key, value) do
+        {:ok, state} ->
+          broadcast_from!(socket, "state:patch", %{
+            "op" => "set",
+            "key" => key,
+            "value" => value,
+            "state" => state
+          })
 
-        {:reply, :ok, socket}
+          {:reply, :ok, socket}
 
-      {:error, reason} ->
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        {:error, reason} ->
+          {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      end
+    else
+      {:rate_limited, socket} -> {:reply, @rate_limited_reply, socket}
     end
   end
 
   @impl true
   def handle_in("state:delete", %{"key" => key}, socket) do
-    room_id = socket.assigns.room_id
+    with :ok <- check_rate_limit(socket) do
+      room_id = socket.assigns.room_id
 
-    case Room.delete(room_id, key) do
-      {:ok, _value, state} ->
-        broadcast_from!(socket, "state:patch", %{
-          "op" => "delete",
-          "key" => key,
-          "state" => state
-        })
+      case Room.delete(room_id, key) do
+        {:ok, _value, state} ->
+          broadcast_from!(socket, "state:patch", %{
+            "op" => "delete",
+            "key" => key,
+            "state" => state
+          })
 
-        {:reply, :ok, socket}
+          {:reply, :ok, socket}
 
-      {:error, reason} ->
-        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+        {:error, reason} ->
+          {:reply, {:error, %{reason: inspect(reason)}}, socket}
+      end
+    else
+      {:rate_limited, socket} -> {:reply, @rate_limited_reply, socket}
     end
   end
 
@@ -160,6 +178,17 @@ defmodule ParlorWeb.RoomChannel do
         rooms when is_list(rooms) -> room_id in rooms
         _ -> false
       end
+    end
+  end
+
+  defp check_rate_limit(%{assigns: %{room_id: room_id, current_user: user}} = socket) do
+    key = {:channel, user.id, room_id}
+    {limit, window_ms} = Application.get_env(:parlor, :channel_rate_limit, {200, 10_000})
+
+    if Parlor.RateLimiter.allow?(key, limit, window_ms) do
+      :ok
+    else
+      {:rate_limited, socket}
     end
   end
 end

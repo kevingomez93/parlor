@@ -14,6 +14,8 @@ Parlor gives any backend language websocket rooms with shared state, presence, a
 - **Idle shutdown** — empty rooms stop automatically after a configurable TTL
 - **Multi-node clustering** — each room runs once cluster-wide via Horde, with Postgres rehydration on recovery
 - **Yjs/CRDT document sync** — one collaborative Y.Doc per room with binary y-protocols over the same channel
+- **Rate limiting** — per-connection channel event limits and HTTP API rate limits
+- **Admin dashboard** — LiveView dashboard at `/admin` for inspecting and managing rooms
 
 ## Prerequisites
 
@@ -165,6 +167,31 @@ Returns room state, member count, presence, KV persistence, and Yjs persistence 
 
 Clients receive the event on their room channel.
 
+## Admin dashboard
+
+Parlor includes a basic-auth protected LiveView dashboard at `/admin` (default credentials `admin` / `admin` in dev).
+
+- View active rooms, member counts, online users, and persistence flags
+- Inspect room state and presence
+- Broadcast custom events to a room
+- Delete persisted KV and Yjs data for a room
+
+## Rate limiting
+
+Parlor applies fixed-window rate limits to protect against abuse:
+
+| Scope | Default | Config key |
+| --- | --- | --- |
+| Channel events (`msg`, `state:*`, `yjs`) | 200 per 10s per connection | `channel_rate_limit` |
+| HTTP API (`/api/rooms*`) | 120 per minute per API key or IP | `http_rate_limit` |
+
+When exceeded, channels reply with `{:error, %{reason: "rate_limited"}}` and HTTP returns `429` with a `retry-after` header. `GET /api/health` is not rate limited.
+
+Environment overrides (format `LIMIT,WINDOW_MS`):
+
+- `PARLOR_CHANNEL_RATE_LIMIT` — e.g. `200,10000`
+- `PARLOR_HTTP_RATE_LIMIT` — e.g. `120,60000`
+
 ## Configuration
 
 | Variable | Default (dev) | Description |
@@ -174,6 +201,10 @@ Clients receive the event on their room channel.
 | `PARLOR_API_KEY` | dev key | HTTP API key |
 | `PARLOR_ROOM_TTL` | `60000` | Milliseconds before idle rooms and Y.Doc processes shut down |
 | `PARLOR_AUTH` | `none` in dev, `jwt` in prod | Set to `none` to disable JWT auth |
+| `PARLOR_ADMIN_USER` | `admin` | Admin dashboard basic auth username |
+| `PARLOR_ADMIN_PASSWORD` | `admin` | Admin dashboard basic auth password |
+| `PARLOR_CHANNEL_RATE_LIMIT` | `200,10000` | Channel rate limit as `limit,window_ms` |
+| `PARLOR_HTTP_RATE_LIMIT` | `120,60000` | HTTP API rate limit as `limit,window_ms` |
 | `PORT` | `4000` | HTTP port |
 | `SECRET_KEY_BASE` | required in prod | Phoenix secret |
 | `POOL_SIZE` | `10` | Database connection pool size (prod) |
@@ -241,10 +272,7 @@ cd examples && python3 -m http.server 8080
 
 - `http://localhost:8080/cursors.html` — multiplayer cursors via KV `msg` events
 - `http://localhost:8080/collab.html` — collaborative text editor via Yjs CRDT sync
-
-## Roadmap
-
-- Rate limiting and admin dashboard
+- `http://localhost:4000/admin` — admin dashboard (basic auth: `admin` / `admin`)
 
 ## License
 

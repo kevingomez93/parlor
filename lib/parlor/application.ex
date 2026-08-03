@@ -7,6 +7,7 @@ defmodule Parlor.Application do
   def start(_type, _args) do
     children = [
       ParlorWeb.Telemetry,
+      Parlor.RateLimiter,
       Parlor.Repo,
       {DNSCluster, query: Application.get_env(:parlor, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Parlor.PubSub},

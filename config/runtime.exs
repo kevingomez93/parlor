@@ -33,6 +33,46 @@ if config_env() in [:dev, :prod] do
       parlor_config
     end
 
+  parlor_config =
+    if admin_user = System.get_env("PARLOR_ADMIN_USER") do
+      Keyword.put(parlor_config, :admin_user, admin_user)
+    else
+      parlor_config
+    end
+
+  parlor_config =
+    if admin_password = System.get_env("PARLOR_ADMIN_PASSWORD") do
+      Keyword.put(parlor_config, :admin_password, admin_password)
+    else
+      parlor_config
+    end
+
+  parlor_config =
+    if value = System.get_env("PARLOR_CHANNEL_RATE_LIMIT") do
+      [limit, window_ms] = String.split(value, ",", parts: 2)
+
+      Keyword.put(
+        parlor_config,
+        :channel_rate_limit,
+        {String.to_integer(limit), String.to_integer(window_ms)}
+      )
+    else
+      parlor_config
+    end
+
+  parlor_config =
+    if value = System.get_env("PARLOR_HTTP_RATE_LIMIT") do
+      [limit, window_ms] = String.split(value, ",", parts: 2)
+
+      Keyword.put(
+        parlor_config,
+        :http_rate_limit,
+        {String.to_integer(limit), String.to_integer(window_ms)}
+      )
+    else
+      parlor_config
+    end
+
   config :parlor, parlor_config
 end
 

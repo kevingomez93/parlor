@@ -4,7 +4,7 @@ defmodule Parlor.MixProject do
   def project do
     [
       app: :parlor,
-      version: "0.4.0",
+      version: "0.5.0",
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -34,6 +34,7 @@ defmodule Parlor.MixProject do
     [
       {:phoenix, "~> 1.8.9"},
       {:phoenix_live_dashboard, "~> 0.8.3"},
+      {:phoenix_live_view, "~> 1.2"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:ecto_sql, "~> 3.12"},
@@ -43,7 +44,8 @@ defmodule Parlor.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:horde, "~> 0.9"},
       {:y_ex, "~> 0.10"},
-      {:bandit, "~> 1.5"}
+      {:bandit, "~> 1.5"},
+      {:lazy_html, ">= 0.1.0", only: :test}
     ]
   end
 

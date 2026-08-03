@@ -7,7 +7,11 @@ config :parlor,
   api_key: "dev-api-key-change-me",
   room_ttl: 60_000,
   yjs_flush_size: 400,
-  auth_mode: :none
+  auth_mode: :none,
+  channel_rate_limit: {200, 10_000},
+  http_rate_limit: {120, 60_000},
+  admin_user: "admin",
+  admin_password: "admin"
 
 config :parlor, ParlorWeb.Endpoint,
   url: [host: "localhost"],

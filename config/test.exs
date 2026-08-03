@@ -4,7 +4,9 @@ config :parlor,
   signing_secret: "test-signing-secret",
   api_key: "test-api-key",
   room_ttl: 100,
-  auth_mode: :jwt
+  auth_mode: :jwt,
+  admin_user: "admin",
+  admin_password: "admin"
 
 config :parlor, Parlor.Repo,
   username: "parlor",

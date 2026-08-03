@@ -34,6 +34,28 @@ defmodule ParlorWeb do
     end
   end
 
+  def html do
+    quote do
+      use Phoenix.Component
+
+      import Phoenix.Controller,
+        only: [get_csrf_token: 0, view_module: 1, view_template: 1]
+
+      alias ParlorWeb.Layouts
+
+      unquote(verified_routes())
+    end
+  end
+
+  def live_view do
+    quote do
+      use Phoenix.LiveView,
+        layout: {ParlorWeb.Layouts, :root}
+
+      unquote(html())
+    end
+  end
+
   def controller do
     quote do
       use Phoenix.Controller, formats: [:html, :json]

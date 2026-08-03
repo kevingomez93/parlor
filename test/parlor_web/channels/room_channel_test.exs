@@ -83,4 +83,29 @@ defmodule ParlorWeb.RoomChannelTest do
     :ok = Rooms.broadcast(room_id, "server:event", %{"message" => "from backend"})
     assert_push "server:event", %{"message" => "from backend"}
   end
+
+  test "rate limits channel events" do
+    Application.put_env(:parlor, :channel_rate_limit, {2, 10_000})
+
+    on_exit(fn ->
+      Application.put_env(:parlor, :channel_rate_limit, {200, 10_000})
+    end)
+
+    room_id = "rate-limit-#{System.unique_integer([:positive])}"
+
+    {:ok, socket} =
+      connect(ParlorWeb.RoomSocket, %{"token" => build_token(%{"sub" => "rate-user"})})
+
+    {:ok, _, socket} = subscribe_and_join(socket, "room:#{room_id}", %{})
+    assert_push "state:sync", %{state: %{}}
+
+    ref1 = push(socket, "msg", %{"text" => "one"})
+    assert_reply ref1, :ok, %{}
+
+    ref2 = push(socket, "msg", %{"text" => "two"})
+    assert_reply ref2, :ok, %{}
+
+    ref3 = push(socket, "msg", %{"text" => "three"})
+    assert_reply ref3, :error, %{reason: "rate_limited"}
+  end
 end

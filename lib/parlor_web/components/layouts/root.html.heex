@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <title>Parlor Admin</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f172a;
+        --panel: #1e293b;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --danger: #f87171;
+        --ok: #4ade80;
+        --border: #334155;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.5;
+      }
+
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+
+      .admin-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .brand { font-weight: 700; font-size: 1.1rem; color: var(--text); }
+
+      .admin-main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+
+      .stats {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.5rem;
+      }
+
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        min-width: 140px;
+      }
+
+      .stat-label { color: var(--muted); font-size: 0.85rem; }
+      .stat-value { font-size: 1.4rem; font-weight: 700; }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        overflow: hidden;
+      }
+
+      th, td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+
+      th { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+      tr:last-child td { border-bottom: none; }
+
+      .badge {
+        display: inline-block;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        border: 1px solid var(--border);
+      }
+
+      .badge-yes { color: var(--ok); border-color: var(--ok); }
+      .badge-no { color: var(--muted); }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .panel h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+
+      pre {
+        background: #020617;
+        border: 1px solid var(--border);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow: auto;
+        font-size: 0.85rem;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.35rem;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      input, textarea {
+        width: 100%;
+        padding: 0.55rem 0.65rem;
+        border-radius: 0.4rem;
+        border: 1px solid var(--border);
+        background: #020617;
+        color: var(--text);
+        margin-bottom: 0.75rem;
+      }
+
+      button, .button {
+        display: inline-block;
+        padding: 0.55rem 0.9rem;
+        border-radius: 0.4rem;
+        border: 1px solid var(--accent);
+        background: transparent;
+        color: var(--accent);
+        cursor: pointer;
+        font: inherit;
+      }
+
+      button.danger, .button.danger {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      .flash-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+      .flash {
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.4rem;
+        font-size: 0.85rem;
+        cursor: pointer;
+      }
+      .flash-info { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
+      .flash-error { background: rgba(248, 113, 113, 0.15); color: var(--danger); }
+
+      .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    </style>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/phoenix.min.js"}>
+    </script>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/phoenix_live_view.min.js"}>
+    </script>
+    <script defer phx-track-static type="text/javascript" src={~p"/assets/admin.js"}>
+    </script>
+  </head>
+  <body>
+    {@inner_content}
+  </body>
+</html>
