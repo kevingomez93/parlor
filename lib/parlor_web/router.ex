@@ -9,6 +9,12 @@ defmodule ParlorWeb.Router do
     plug ParlorWeb.Plugs.ApiAuth
   end
 
+  scope "/", ParlorWeb do
+    pipe_through :api
+
+    get "/", PageController, :index
+  end
+
   scope "/api", ParlorWeb do
     pipe_through :api
 
