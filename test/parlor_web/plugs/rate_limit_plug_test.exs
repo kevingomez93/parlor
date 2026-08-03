@@ -5,6 +5,7 @@ defmodule ParlorWeb.RateLimitPlugTest do
 
   setup do
     Application.put_env(:parlor, :http_rate_limit, {2, 60_000})
+    Parlor.RateLimiter.reset({:http, :api_key, @api_key})
 
     on_exit(fn ->
       Application.put_env(:parlor, :http_rate_limit, {120, 60_000})
