@@ -14,7 +14,8 @@ defmodule ParlorWeb.ChannelCase do
     end
   end
 
-  setup _tags do
+  setup tags do
+    Parlor.DataCase.setup_sandbox(tags)
     {:ok, token: build_token()}
   end
 

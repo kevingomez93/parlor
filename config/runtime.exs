@@ -37,6 +37,17 @@ if config_env() in [:dev, :prod] do
 end
 
 if config_env() == :prod do
+  database_url =
+    System.get_env("DATABASE_URL") ||
+      raise """
+      environment variable DATABASE_URL is missing.
+      For example: ecto://USER:PASS@HOST/DATABASE
+      """
+
+  config :parlor, Parlor.Repo,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
       raise """
@@ -46,6 +57,8 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
+  # Clustering: set DNS_CLUSTER_QUERY so dns_cluster connects BEAM nodes, and use the
+  # same RELEASE_COOKIE on every instance. Horde distributes room processes automatically.
   config :parlor, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :parlor, ParlorWeb.Endpoint,

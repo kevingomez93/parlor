@@ -1,6 +1,7 @@
 import Config
 
 config :parlor,
+  ecto_repos: [Parlor.Repo],
   generators: [timestamp_type: :utc_datetime],
   signing_secret: "dev-signing-secret-change-me",
   api_key: "dev-api-key-change-me",

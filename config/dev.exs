@@ -1,5 +1,14 @@
 import Config
 
+config :parlor, Parlor.Repo,
+  username: "parlor",
+  password: "parlor",
+  hostname: "localhost",
+  database: "parlor_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+
 config :parlor, ParlorWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,

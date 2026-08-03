@@ -4,7 +4,7 @@ defmodule Parlor.MixProject do
   def project do
     [
       app: :parlor,
-      version: "0.1.0",
+      version: "0.3.0",
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -36,16 +36,21 @@ defmodule Parlor.MixProject do
       {:phoenix_live_dashboard, "~> 0.8.3"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
+      {:ecto_sql, "~> 3.12"},
+      {:postgrex, ">= 0.0.0"},
       {:jason, "~> 1.2"},
       {:joken, "~> 2.6"},
       {:dns_cluster, "~> 0.2.0"},
+      {:horde, "~> 0.9"},
       {:bandit, "~> 1.5"}
     ]
   end
 
   defp aliases do
     [
-      setup: ["deps.get"],
+      setup: ["deps.get", "ecto.setup"],
+      "ecto.setup": ["ecto.create", "ecto.migrate"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
       precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
     ]
   end

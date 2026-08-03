@@ -1,5 +1,5 @@
 defmodule ParlorWeb.RoomControllerTest do
-  use ParlorWeb.ConnCase, async: true
+  use ParlorWeb.ConnCase, async: false
 
   @api_key "test-api-key"
 
@@ -34,6 +34,7 @@ defmodule ParlorWeb.RoomControllerTest do
     data = json_response(conn, 200)["data"]
     assert data["id"] == room_id
     assert data["state"] == %{"status" => "ready"}
+    assert data["persisted"] == true
     assert is_map(data["presence"])
   end
 

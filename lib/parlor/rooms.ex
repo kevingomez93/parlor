@@ -4,18 +4,19 @@ defmodule Parlor.Rooms do
   """
 
   alias Parlor.Room
+  alias Parlor.Rooms.Store
 
   @doc """
   Ensures a room process exists for the given room id.
   """
   @spec ensure_room(String.t()) :: {:ok, pid()} | {:error, term()}
   def ensure_room(room_id) when is_binary(room_id) do
-    case Registry.lookup(Parlor.RoomRegistry, room_id) do
+    case Horde.Registry.lookup(Parlor.RoomRegistry, room_id) do
       [{pid, _}] ->
         {:ok, pid}
 
       [] ->
-        case DynamicSupervisor.start_child(Parlor.RoomSupervisor, {Room, room_id}) do
+        case Horde.DynamicSupervisor.start_child(Parlor.RoomSupervisor, {Room, room_id}) do
           {:ok, pid} -> {:ok, pid}
           {:error, {:already_started, pid}} -> {:ok, pid}
           other -> other
@@ -40,7 +41,7 @@ defmodule Parlor.Rooms do
   """
   @spec get_info(String.t()) :: {:ok, map()} | {:error, :not_found}
   def get_info(room_id) when is_binary(room_id) do
-    case Registry.lookup(Parlor.RoomRegistry, room_id) do
+    case Horde.Registry.lookup(Parlor.RoomRegistry, room_id) do
       [{pid, _}] ->
         info = GenServer.call(pid, :info)
         presence = ParlorWeb.Presence.list(topic(room_id))
@@ -48,7 +49,8 @@ defmodule Parlor.Rooms do
         {:ok,
          info
          |> Map.put(:presence, presence)
-         |> Map.put(:online_count, map_size(presence))}
+         |> Map.put(:online_count, map_size(presence))
+         |> Map.put(:persisted, Store.persisted?(room_id))}
 
       [] ->
         {:error, :not_found}
@@ -56,12 +58,12 @@ defmodule Parlor.Rooms do
   end
 
   @doc """
-  Lists all active rooms.
+  Lists all active rooms across the cluster.
   """
   @spec list() :: [map()]
   def list do
     Parlor.RoomRegistry
-    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Horde.Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
     |> Enum.map(fn {room_id, pid} ->
       info = GenServer.call(pid, :info)
 

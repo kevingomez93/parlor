@@ -7,10 +7,15 @@ defmodule Parlor.Application do
   def start(_type, _args) do
     children = [
       ParlorWeb.Telemetry,
+      Parlor.Repo,
       {DNSCluster, query: Application.get_env(:parlor, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Parlor.PubSub},
-      {Registry, keys: :unique, name: Parlor.RoomRegistry},
-      {DynamicSupervisor, name: Parlor.RoomSupervisor, strategy: :one_for_one},
+      {Horde.Registry, name: Parlor.RoomRegistry, keys: :unique, members: :auto},
+      {Horde.DynamicSupervisor,
+       name: Parlor.RoomSupervisor,
+       strategy: :one_for_one,
+       distribution_strategy: Horde.UniformDistribution,
+       members: :auto},
       ParlorWeb.Presence,
       ParlorWeb.Endpoint
     ]

@@ -63,7 +63,7 @@
     </header>
     <div id="stage"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/phoenix@1.7.21/priv/static/phoenix.min.js"></script>
+    <script src="phoenix.min.js"></script>
     <script>
       const stage = document.getElementById("stage");
       const status = document.getElementById("status");
@@ -71,6 +71,7 @@
       const color = `hsl(${Math.floor(Math.random() * 360)} 80% 60%)`;
       const cursors = new Map();
 
+      const { Socket } = Phoenix;
       const socket = new Socket("ws://localhost:4000/socket", { params: {} });
       socket.connect();
 
