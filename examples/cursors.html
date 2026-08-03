@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parlor Cursors Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #334155;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      #stage {
+        position: relative;
+        height: calc(100vh - 64px);
+        cursor: crosshair;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top, #1e293b, #0f172a 60%),
+          linear-gradient(transparent 31px, #1e293b 32px),
+          linear-gradient(90deg, transparent 31px, #1e293b 32px);
+        background-size: auto, 32px 32px, 32px 32px;
+      }
+
+      .cursor {
+        position: absolute;
+        transform: translate(-8px, -8px);
+        pointer-events: none;
+        transition: left 80ms linear, top 80ms linear;
+      }
+
+      .cursor svg {
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+      }
+
+      .label {
+        margin-top: 4px;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Parlor Cursors</strong>
+      <span id="status">Connecting…</span>
+    </header>
+    <div id="stage"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phoenix@1.7.21/priv/static/phoenix.min.js"></script>
+    <script>
+      const stage = document.getElementById("stage");
+      const status = document.getElementById("status");
+      const userId = "user-" + Math.random().toString(36).slice(2, 8);
+      const color = `hsl(${Math.floor(Math.random() * 360)} 80% 60%)`;
+      const cursors = new Map();
+
+      const socket = new Socket("ws://localhost:4000/socket", { params: {} });
+      socket.connect();
+
+      const room = socket.channel("room:cursors-demo", {});
+      room.join()
+        .receive("ok", () => {
+          status.textContent = `Connected as ${userId}`;
+        })
+        .receive("error", (err) => {
+          status.textContent = `Failed: ${JSON.stringify(err)}`;
+        });
+
+      function renderCursor(id, x, y, name, cursorColor) {
+        let node = cursors.get(id);
+        if (!node) {
+          node = document.createElement("div");
+          node.className = "cursor";
+          node.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="${cursorColor}">
+              <path d="M4 3l14 8-6.2 1.4L9 21z"/>
+            </svg>
+            <div class="label" style="background:${cursorColor}; color:#0f172a">${name}</div>
+          `;
+          stage.appendChild(node);
+          cursors.set(id, node);
+        }
+
+        node.style.left = `${x}px`;
+        node.style.top = `${y}px`;
+      }
+
+      room.on("msg", (payload) => {
+        if (payload.type !== "cursor") return;
+        renderCursor(payload.from, payload.x, payload.y, payload.name, payload.color);
+      });
+
+      room.on("presence_diff", (diff) => {
+        for (const id of Object.keys(diff.leaves || {})) {
+          const node = cursors.get(id);
+          if (node) {
+            node.remove();
+            cursors.delete(id);
+          }
+        }
+      });
+
+      stage.addEventListener("mousemove", (event) => {
+        const rect = stage.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        renderCursor(userId, x, y, userId, color);
+
+        room.push("msg", {
+          type: "cursor",
+          x,
+          y,
+          name: userId,
+          color
+        });
+      });
+    </script>
+  </body>
+</html>

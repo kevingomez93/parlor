@@ -1,0 +1,65 @@
+import Config
+
+if System.get_env("PHX_SERVER") do
+  config :parlor, ParlorWeb.Endpoint, server: true
+end
+
+config :parlor, ParlorWeb.Endpoint,
+  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+
+if config_env() in [:dev, :prod] do
+  auth_mode =
+    case System.get_env("PARLOR_AUTH", if(config_env() == :dev, do: "none", else: "jwt")) do
+      "none" -> :none
+      _ -> :jwt
+    end
+
+  parlor_config = [
+    auth_mode: auth_mode,
+    room_ttl: String.to_integer(System.get_env("PARLOR_ROOM_TTL", "60000"))
+  ]
+
+  parlor_config =
+    if secret = System.get_env("PARLOR_SIGNING_SECRET") do
+      Keyword.put(parlor_config, :signing_secret, secret)
+    else
+      parlor_config
+    end
+
+  parlor_config =
+    if api_key = System.get_env("PARLOR_API_KEY") do
+      Keyword.put(parlor_config, :api_key, api_key)
+    else
+      parlor_config
+    end
+
+  config :parlor, parlor_config
+end
+
+if config_env() == :prod do
+  secret_key_base =
+    System.get_env("SECRET_KEY_BASE") ||
+      raise """
+      environment variable SECRET_KEY_BASE is missing.
+      You can generate one by calling: mix phx.gen.secret
+      """
+
+  host = System.get_env("PHX_HOST") || "example.com"
+
+  config :parlor, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  config :parlor, ParlorWeb.Endpoint,
+    url: [host: host, port: 443, scheme: "https"],
+    http: [
+      ip: {0, 0, 0, 0, 0, 0, 0, 0}
+    ],
+    secret_key_base: secret_key_base
+
+  unless System.get_env("PARLOR_SIGNING_SECRET") do
+    raise "environment variable PARLOR_SIGNING_SECRET is missing"
+  end
+
+  unless System.get_env("PARLOR_API_KEY") do
+    raise "environment variable PARLOR_API_KEY is missing"
+  end
+end

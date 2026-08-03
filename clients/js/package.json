@@ -1,0 +1,23 @@
+{
+  "name": "@parlor/client",
+  "version": "0.1.0",
+  "description": "TypeScript client for Parlor stateful rooms server",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "phoenix": "^1.7.0"
+  },
+  "devDependencies": {
+    "phoenix": "^1.7.21",
+    "typescript": "^5.8.3"
+  },
+  "license": "MIT"
+}
