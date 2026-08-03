@@ -5,20 +5,25 @@ defmodule ParlorWeb.RoomChannel do
 
   alias Parlor.Room
   alias Parlor.Rooms
+  alias Parlor.YDoc
 
   @impl true
   def join("room:" <> room_id, _params, socket) do
     user = socket.assigns.current_user
 
     if authorized?(user, room_id) do
-      with {:ok, _pid} <- Rooms.ensure_room(room_id) do
+      with {:ok, _pid} <- Rooms.ensure_room(room_id),
+           {:ok, doc_pid} <- YDoc.ensure(room_id) do
         :ok = Room.member_joined(room_id)
+        :ok = YDoc.member_joined(room_id)
+        Process.monitor(doc_pid)
         send(self(), :after_join)
 
         socket =
           socket
           |> assign(:room_id, room_id)
           |> assign(:topic, Rooms.topic(room_id))
+          |> assign(:doc_pid, doc_pid)
 
         {:ok, socket}
       end
@@ -42,6 +47,29 @@ defmodule ParlorWeb.RoomChannel do
     {:noreply, socket}
   end
 
+  def handle_info({:yjs, message, _pid}, socket) when is_binary(message) do
+    push(socket, "yjs", {:binary, message})
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        {:DOWN, _ref, :process, pid, _reason},
+        %{assigns: %{doc_pid: pid, room_id: room_id}} = socket
+      ) do
+    case YDoc.ensure(room_id) do
+      {:ok, doc_pid} ->
+        Process.monitor(doc_pid)
+        push(socket, "yjs_resync", %{})
+        {:noreply, assign(socket, :doc_pid, doc_pid)}
+
+      {:error, reason} ->
+        push(socket, "yjs_resync", %{reason: inspect(reason)})
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, socket), do: {:noreply, socket}
+
   @impl true
   def handle_out(event, payload, socket) do
     push(socket, event, payload)
@@ -52,6 +80,26 @@ defmodule ParlorWeb.RoomChannel do
   def handle_in("msg", payload, socket) when is_map(payload) do
     broadcast_from!(socket, "msg", Map.put(payload, "from", socket.assigns.current_user.id))
     {:reply, :ok, socket}
+  end
+
+  @impl true
+  def handle_in("yjs_sync", payload, socket), do: handle_in("yjs", payload, socket)
+
+  @impl true
+  def handle_in("yjs", {:binary, chunk}, socket) when is_binary(chunk) do
+    room_id = socket.assigns.room_id
+
+    case YDoc.process_message(room_id, chunk, self()) do
+      {:ok, replies} ->
+        Enum.each(replies, &push(socket, "yjs", {:binary, &1}))
+        {:reply, :ok, socket}
+
+      :ok ->
+        {:reply, :ok, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: inspect(reason)}}, socket}
+    end
   end
 
   @impl true
@@ -97,6 +145,7 @@ defmodule ParlorWeb.RoomChannel do
   def terminate(_reason, socket) do
     if room_id = socket.assigns[:room_id] do
       Room.member_left(room_id)
+      YDoc.member_left(room_id)
     end
 
     :ok

@@ -29,3 +29,6 @@ test_elixir-*.tar
 # Elixir LS / IDE artifacts
 .elixir_ls/
 
+# Node
+clients/js/node_modules/
+clients/js/dist/

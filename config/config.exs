@@ -6,6 +6,7 @@ config :parlor,
   signing_secret: "dev-signing-secret-change-me",
   api_key: "dev-api-key-change-me",
   room_ttl: 60_000,
+  yjs_flush_size: 400,
   auth_mode: :none
 
 config :parlor, ParlorWeb.Endpoint,

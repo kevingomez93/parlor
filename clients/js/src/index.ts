@@ -1,4 +1,6 @@
 import { Channel, Socket } from "phoenix";
+import * as Y from "yjs";
+import { PhoenixChannelProvider } from "y-phoenix-channel";
 
 export type ParlorOptions = {
   url: string;
@@ -19,8 +21,15 @@ export type StateSync = {
   state: Record<string, unknown>;
 };
 
+export type YDocProviderOptions = {
+  awareness?: import("y-protocols/awareness").Awareness;
+  resyncInterval?: number;
+  updateThrottle?: number;
+  awarenessThrottle?: number;
+};
+
 export class Parlor {
-  private socket: Socket;
+  readonly socket: Socket;
 
   constructor(options: ParlorOptions) {
     const params = {
@@ -34,7 +43,7 @@ export class Parlor {
 
   join(roomId: string): ParlorRoom {
     const channel = this.socket.channel(`room:${roomId}`, {});
-    return new ParlorRoom(channel);
+    return new ParlorRoom(roomId, channel);
   }
 
   disconnect(): void {
@@ -43,16 +52,18 @@ export class Parlor {
 }
 
 export class ParlorRoom {
-  private channel: Channel;
+  readonly roomId: string;
+  readonly channel: Channel;
   private joined: Promise<void>;
 
-  constructor(channel: Channel) {
+  constructor(roomId: string, channel: Channel) {
+    this.roomId = roomId;
     this.channel = channel;
     this.joined = new Promise((resolve, reject) => {
       channel
         .join()
         .receive("ok", () => resolve())
-        .receive("error", (response) => reject(response));
+        .receive("error", (response: unknown) => reject(response));
     });
   }
 
@@ -71,22 +82,43 @@ export class ParlorRoom {
     this.channel.push("state:delete", { key });
   }
 
+  async connectYDoc(
+    doc: Y.Doc = new Y.Doc(),
+    options: YDocProviderOptions = {}
+  ): Promise<PhoenixChannelProvider> {
+    await this.joined;
+
+    const provider = new PhoenixChannelProvider(
+      this.channel.socket,
+      `room:${this.roomId}`,
+      doc,
+      {
+        channel: this.channel,
+        connect: true,
+        disableBc: true,
+        ...options
+      }
+    );
+
+    return provider;
+  }
+
   onMessage(callback: (payload: Record<string, unknown>) => void): void {
-    this.channel.on("msg", callback);
+    this.channel.on("msg", callback as (payload: unknown) => void);
   }
 
   onStateChange(
     callback: (patch: StatePatch | StateSync) => void
   ): void {
-    this.channel.on("state:patch", callback);
-    this.channel.on("state:sync", callback);
+    this.channel.on("state:patch", callback as (payload: unknown) => void);
+    this.channel.on("state:sync", callback as (payload: unknown) => void);
   }
 
   onPresence(
     callback: (payload: Record<string, unknown>) => void
   ): void {
-    this.channel.on("presence_state", callback);
-    this.channel.on("presence_diff", callback);
+    this.channel.on("presence_state", callback as (payload: unknown) => void);
+    this.channel.on("presence_diff", callback as (payload: unknown) => void);
   }
 
   onEvent(event: string, callback: (payload: unknown) => void): void {
@@ -97,3 +129,6 @@ export class ParlorRoom {
     this.channel.leave();
   }
 }
+
+export { PhoenixChannelProvider };
+export * as Y from "yjs";

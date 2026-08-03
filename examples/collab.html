@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Parlor Collab Demo</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        min-height: 100vh;
+      }
+
+      header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #334155;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      #status {
+        font-size: 0.9rem;
+        color: #94a3b8;
+      }
+
+      main {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 1.5rem;
+      }
+
+      #editor {
+        width: 100%;
+        min-height: 320px;
+        padding: 1rem 1.25rem;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        background: #111827;
+        color: #f8fafc;
+        font: 1rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+        resize: vertical;
+      }
+
+      #editor:focus {
+        outline: 2px solid #6366f1;
+        outline-offset: 2px;
+      }
+
+      #peers {
+        margin-top: 1rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .peer {
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        background: #1e293b;
+        border: 1px solid #334155;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <strong>Parlor Collab</strong>
+      <span id="status">Connecting…</span>
+    </header>
+    <main>
+      <textarea id="editor" placeholder="Start typing — open another tab to collaborate…"></textarea>
+      <div id="peers"></div>
+    </main>
+
+    <script src="phoenix.min.js"></script>
+    <script type="module">
+      import * as Y from "https://esm.sh/yjs@13.6.27";
+      import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate } from "https://esm.sh/y-protocols/awareness@1.0.6?deps=yjs@13.6.27";
+      import * as encoding from "https://esm.sh/lib0/encoding@0.2.93";
+      import * as decoding from "https://esm.sh/lib0/decoding@0.2.93";
+      import * as syncProtocol from "https://esm.sh/y-protocols/sync@1.0.6?deps=yjs@13.6.27";
+
+      const status = document.getElementById("status");
+      const editor = document.getElementById("editor");
+      const peersEl = document.getElementById("peers");
+      const userId = "user-" + Math.random().toString(36).slice(2, 8);
+      const color = `hsl(${Math.floor(Math.random() * 360)} 80% 60%)`;
+
+      const { Socket } = Phoenix;
+      const socket = new Socket("ws://localhost:4000/socket", { params: {} });
+      socket.connect();
+
+      const ydoc = new Y.Doc();
+      const ytext = ydoc.getText("content");
+      const awareness = new Awareness(ydoc);
+
+      awareness.setLocalStateField("name", userId);
+      awareness.setLocalStateField("color", color);
+
+      const channel = socket.channel("room:collab-demo", {});
+      let synced = false;
+
+      function bindEditor() {
+        editor.value = ytext.toString();
+
+        editor.addEventListener("input", () => {
+          if (!synced) return;
+          const current = ytext.toString();
+          const next = editor.value;
+          if (current === next) return;
+
+          ydoc.transact(() => {
+            ytext.delete(0, current.length);
+            ytext.insert(0, next);
+          });
+        });
+
+        ytext.observe(() => {
+          if (editor.value !== ytext.toString()) {
+            const pos = editor.selectionStart;
+            editor.value = ytext.toString();
+            editor.selectionStart = editor.selectionEnd = pos;
+          }
+        });
+      }
+
+      function renderPeers() {
+        peersEl.innerHTML = "";
+        awareness.getStates().forEach((state, clientId) => {
+          if (!state) return;
+          const chip = document.createElement("span");
+          chip.className = "peer";
+          chip.style.borderColor = state.color || "#6366f1";
+          chip.textContent = state.name || `client-${clientId}`;
+          peersEl.appendChild(chip);
+        });
+      }
+
+      awareness.on("change", renderPeers);
+
+      function readMessage(buf) {
+        const decoder = decoding.createDecoder(new Uint8Array(buf));
+        const encoder = encoding.createEncoder();
+        const messageType = decoding.readVarUint(decoder);
+
+        if (messageType === 0) {
+          const syncType = syncProtocol.readSyncMessage(decoder, encoder, ydoc, null);
+          if (syncType === syncProtocol.messageYjsSyncStep2 && !synced) {
+            synced = true;
+            status.textContent = `Connected as ${userId}`;
+            bindEditor();
+          }
+        } else if (messageType === 1) {
+          const update = decoding.readVarUint8Array(decoder);
+          applyAwarenessUpdate(awareness, update, null);
+        }
+
+        if (encoding.length(encoder) > 1) {
+          channel.push("yjs", encoding.toUint8Array(encoder).buffer);
+        }
+      }
+
+      channel.on("yjs", (data) => readMessage(data));
+      channel.on("yjs_resync", () => {
+        synced = false;
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, 0);
+        syncProtocol.writeSyncStep1(encoder, ydoc);
+        channel.push("yjs_sync", encoding.toUint8Array(encoder).buffer);
+      });
+
+      ydoc.on("update", (update) => {
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, 0);
+        syncProtocol.writeUpdate(encoder, update);
+        channel.push("yjs", encoding.toUint8Array(encoder).buffer);
+      });
+
+      awareness.on("update", ({ added, updated, removed }) => {
+        const changed = added.concat(updated, removed);
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, 1);
+        encoding.writeVarUint8Array(
+          encoder,
+          encodeAwarenessUpdate(awareness, changed)
+        );
+        channel.push("yjs", encoding.toUint8Array(encoder).buffer);
+      });
+
+      channel
+        .join()
+        .receive("ok", () => {
+          const encoder = encoding.createEncoder();
+          encoding.writeVarUint(encoder, 0);
+          syncProtocol.writeSyncStep1(encoder, ydoc);
+          channel.push("yjs_sync", encoding.toUint8Array(encoder).buffer);
+
+          const awarenessEncoder = encoding.createEncoder();
+          encoding.writeVarUint(awarenessEncoder, 1);
+          encoding.writeVarUint8Array(
+            awarenessEncoder,
+            encodeAwarenessUpdate(awareness, [ydoc.clientID])
+          );
+          channel.push("yjs", encoding.toUint8Array(awarenessEncoder).buffer);
+        })
+        .receive("error", (err) => {
+          status.textContent = `Failed: ${JSON.stringify(err)}`;
+        });
+
+      window.addEventListener("beforeunload", () => {
+        awareness.setLocalState(null);
+        channel.leave();
+      });
+    </script>
+  </body>
+</html>

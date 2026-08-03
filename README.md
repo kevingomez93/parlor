@@ -13,11 +13,14 @@ Parlor gives any backend language websocket rooms with shared state, presence, a
 - **HTTP push API** — broadcast events into rooms from your server
 - **Idle shutdown** — empty rooms stop automatically after a configurable TTL
 - **Multi-node clustering** — each room runs once cluster-wide via Horde, with Postgres rehydration on recovery
+- **Yjs/CRDT document sync** — one collaborative Y.Doc per room with binary y-protocols over the same channel
 
 ## Prerequisites
 
 - Elixir 1.17+ and Erlang/OTP 26+
 - Docker (recommended) or a local Postgres 16 instance
+
+`y_ex` ships as a precompiled NIF (Rustler). Production releases must target a supported OTP/arch combination; see the [y_ex](https://hex.pm/packages/y_ex) release assets if you deploy on Linux.
 
 ## Quickstart
 
@@ -57,6 +60,36 @@ room.on("msg", (payload) => console.log("message", payload));
 room.push("msg", { text: "hello" });
 room.push("state:set", { key: "status", value: "ready" });
 ```
+
+## Yjs document sync
+
+Each room has one server-authoritative Y.Doc (via [y_ex](https://hex.pm/packages/y_ex)). Sync uses binary [y-protocols](https://github.com/yjs/y-protocols) messages on the same `room:*` channel — KV state, `msg`, and Presence continue to work unchanged.
+
+| Event | Direction | Payload |
+| --- | --- | --- |
+| `yjs` | both | binary y-protocols frame (`sync` + `awareness`) |
+| `yjs_sync` | client → server | alias for initial sync step 1 (same handler as `yjs`) |
+| `yjs_resync` | server → client | `{}` — DocServer restarted; client should re-sync |
+
+### TypeScript client
+
+Install peer deps (`yjs`, `y-phoenix-channel`, `y-protocols`) then:
+
+```typescript
+import * as Y from "yjs";
+import { Parlor } from "@parlor/client";
+
+const parlor = new Parlor({ url: "ws://localhost:4000/socket" });
+const room = parlor.join("collab-demo");
+const doc = new Y.Doc();
+const provider = await room.connectYDoc(doc);
+
+doc.getText("content").observe(() => {
+  console.log(doc.getText("content").toString());
+});
+```
+
+Document updates are persisted in the `yjs_updates` table (append log with snapshot flush). `GET /api/rooms/:id` includes `yjs_persisted: true` when a room has stored Yjs data.
 
 ## Signing JWTs
 
@@ -117,7 +150,7 @@ All room endpoints require the `x-api-key` header.
 
 `GET /api/rooms/:id`
 
-Returns room state, member count, presence, and whether state is persisted.
+Returns room state, member count, presence, KV persistence, and Yjs persistence flags (`persisted`, `yjs_persisted`).
 
 ### Broadcast to room
 
@@ -139,7 +172,7 @@ Clients receive the event on their room channel.
 | `DATABASE_URL` | local Postgres via config | Postgres connection URL (required in prod) |
 | `PARLOR_SIGNING_SECRET` | dev secret | HS256 secret for websocket JWTs |
 | `PARLOR_API_KEY` | dev key | HTTP API key |
-| `PARLOR_ROOM_TTL` | `60000` | Milliseconds before idle rooms shut down |
+| `PARLOR_ROOM_TTL` | `60000` | Milliseconds before idle rooms and Y.Doc processes shut down |
 | `PARLOR_AUTH` | `none` in dev, `jwt` in prod | Set to `none` to disable JWT auth |
 | `PORT` | `4000` | HTTP port |
 | `SECRET_KEY_BASE` | required in prod | Phoenix secret |
@@ -200,11 +233,17 @@ You should see `cluster-test` in the room list from node B.
 
 ## Demo
 
-Open `examples/cursors.html` in a browser while the server is running to see multiplayer cursors over Parlor.
+With the server running:
+
+```bash
+cd examples && python3 -m http.server 8080
+```
+
+- `http://localhost:8080/cursors.html` — multiplayer cursors via KV `msg` events
+- `http://localhost:8080/collab.html` — collaborative text editor via Yjs CRDT sync
 
 ## Roadmap
 
-- Yjs/CRDT document sync
 - Rate limiting and admin dashboard
 
 ## License

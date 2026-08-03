@@ -5,6 +5,7 @@ defmodule Parlor.Rooms do
 
   alias Parlor.Room
   alias Parlor.Rooms.Store
+  alias Parlor.YDoc.Store, as: YDocStore
 
   @doc """
   Ensures a room process exists for the given room id.
@@ -50,7 +51,8 @@ defmodule Parlor.Rooms do
          info
          |> Map.put(:presence, presence)
          |> Map.put(:online_count, map_size(presence))
-         |> Map.put(:persisted, Store.persisted?(room_id))}
+         |> Map.put(:persisted, Store.persisted?(room_id))
+         |> Map.put(:yjs_persisted, YDocStore.persisted?(room_id))}
 
       [] ->
         {:error, :not_found}

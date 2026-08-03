@@ -16,6 +16,12 @@ defmodule Parlor.Application do
        strategy: :one_for_one,
        distribution_strategy: Horde.UniformDistribution,
        members: :auto},
+      {Horde.Registry, name: Parlor.YDocRegistry, keys: :unique, members: :auto},
+      {Horde.DynamicSupervisor,
+       name: Parlor.YDocSupervisor,
+       strategy: :one_for_one,
+       distribution_strategy: Horde.UniformDistribution,
+       members: :auto},
       ParlorWeb.Presence,
       ParlorWeb.Endpoint
     ]
